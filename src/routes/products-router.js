@@ -1,61 +1,65 @@
-const express = require("express");
-const ProductManager = require("../manager/product-manager.js");
-const manager = new ProductManager("./src/data/productos.json");
+import express from "express";
+import ProductManager from "../dao/db/product-manager-db.js";
+
+const manager = new ProductManager();
 const router = express.Router();
 
 let products = [];
-//Listar todos los productos: 
 
+// Listar todos los productos y agregamos el sort para que ordene por precio:
 router.get("/", async (req, res) => {
     const limit = req.query.limit;
+    const sort = req.query.sort; 
+
     try {
-        const arrayProductos = await manager.getProducts();
-        if (limit) {
-            res.send(arrayProductos.slice(0, limit));
-        } else {
-            res.send(arrayProductos);
+        let arrayProductos = await manager.getProducts();
+
+        // Si se especifica el parámetro `sort`, ordenamos los productos
+        if (sort === 'asc') {
+            arrayProductos.sort((a, b) => a.price - b.price);
+        } else if (sort === 'desc') {
+            arrayProductos.sort((a, b) => b.price - a.price);
         }
+
+        // Aplicamos el límite si está definido
+        if (limit) {
+            arrayProductos = arrayProductos.slice(0, limit);
+        }
+
+        res.send(arrayProductos);
     } catch (error) {
         res.status(500).send("Error interno del servidor");
-
     }
-
-})
+});
 
 // Buscar productos por Id:
-
 router.get("/:pid", async (req, res) => {
     let id = req.params.pid;
     try {
-        const producto = await manager.getProductById(parseInt(id));
+        const producto = await manager.getProductById(id);
         if (!producto) {
             res.send("Producto no encontrado");
         } else {
             res.send(producto);
         }
-
     } catch (error) {
-        res.send("Error de producto no esta ese id");
-
+        res.send("Error de producto, no está ese id");
     }
-})
+});
 
-//Agregar nuevo producto: 
-
+// Agregar nuevo producto: 
 router.post("/", async (req, res) => {
     const nuevoProducto = req.body;
 
     try {
         await manager.addProduct(nuevoProducto);
-
         res.status(201).send("Producto agregado exitosamente");
     } catch (error) {
         res.status(500).json({ status: "error", message: error.message });
     }
-})
+});
 
-
-
+// Inicializar productos
 const initializeProducts = async () => {
     try {
         products = await manager.getProducts();
@@ -66,12 +70,10 @@ const initializeProducts = async () => {
 
 initializeProducts();
 
-
-
+// Actualizar producto por ID
 router.put("/:pid", async (req, res) => {
     const { pid } = req.params;
     const { title, description } = req.body;
-
 
     if (!title || !description) {
         return res.status(400).send({ status: "error", message: "Faltan parámetros en el cuerpo de la solicitud" });
@@ -91,6 +93,7 @@ router.put("/:pid", async (req, res) => {
     }
 });
 
+// Eliminar producto por ID
 router.delete("/:pid", async (req, res) => {
     let id = req.params.pid;
     try {
@@ -105,4 +108,15 @@ router.delete("/:pid", async (req, res) => {
     }
 });
 
-module.exports = router;
+// Agregar un nuevo producto (repetido en el original, removido duplicado)
+router.post("/", async (req, res) => {
+    const resultado = await manager.addProduct(req.body);
+
+    if (resultado.success) {
+        res.status(201).send(resultado.message);
+    } else {
+        res.status(400).send(resultado.message);
+    }
+});
+
+export default router;

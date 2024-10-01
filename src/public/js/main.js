@@ -1,5 +1,5 @@
+ import { io } from "socket.io-client"; // Asegúrate de que la librería está instalada
 
-// // Hay que crear una instancia de Socket
 const socket = io();
 
 // Traemos el array de productos
@@ -41,7 +41,7 @@ const eliminarProducto = (id) => {
     socket.emit("eliminarProducto", id);
 };
 
-// Formulario para agregar productos , funcion
+// Formulario para agregar productos
 const productForm = document.getElementById('productForm');
 productForm.addEventListener('submit', (event) => {
     event.preventDefault();

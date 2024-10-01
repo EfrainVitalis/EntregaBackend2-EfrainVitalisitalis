@@ -1,117 +1,71 @@
 
-// const express = require("express");
-// const app = express();
-// const PUERTO = 8080;
-// const productsRouter = require("./routes/products-router.js")
-// const cartsRouter = require("./routes/carts-router.js");
-// const viewsRouter = require("./routes/views-router.js");
+import express from "express";
+import cookieParser from "cookie-parser";
+import passport from "passport";
+import { createServer } from "http";
+import { Server } from "socket.io";
+import { engine } from 'express-handlebars'; 
+import productsRouter from "./routes/products-router.js";
+import cartsRouter from "./routes/carts-router.js";
+import viewsRouter from "./routes/views-router.js";
+import ProductManager from "./dao/db/product-manager-db.js";
+import './database.js'; 
+import viewsUserRouter from "./routes/viewsuser.router.js";
+import userRouter from "./routes/user.router.js";
+import initializePassport from "./config/passport.config.js";
 
-// //Soket.io
-// const socket = require ("socket.io");
-
-// //importo express-handlebars
-// const exphbs = require("express-handlebars");
-
-// //Configuramos Express-Handlebars 
-// app.engine("handlebars", exphbs.engine());
-// app.set("view engine", "handlebars");
-// app.set("views", "./src/views");
-
-// //Middleware: 
-// app.use(express.json()); 
-// app.use(express.static("./srs/public"));
-
-// //Le decimos al servidor que vamos a trabajar con JSON. 
-
-// // Rutas
-// app.use("/api/products", productsRouter);
-// app.use("/api/carts", cartsRouter);
-// app.use("/", viewsRouter);
-
-
-// const httpServer = app.listen(PUERTO, ()=>{
-//     console.log(`Conectado al puerto de Efrain:${PUERTO}`);
-// })
-
-
-// //traemos el productManager
-// const ProductManager = require("./manager/product-manager.js");
-// const manager = new ProductManager("./src/data/productos.json");
-
-// //Soket.io
-// const io = socket(httpServer);
-
-// io.on("connection", async (socket) =>{
-//     console.log("Un cliente se conecto");
-
-// //Envio el array de productos al realtimeProducts
-//     socket.emit("productos", await manager.getProducts());
-
-//     //Recibo el evento eliminarProducto
-// socket.on("eliminarProducto", async (id) =>{
-//     await manager.deleteProduct(id);
-
-//     //Luego actualizamos los productos
-//     io.socket.emit("productos", await manager.getProducts());
-// })
-
-// })
-const express = require("express");
+// Inicialización de la aplicación
 const app = express();
 const PUERTO = 8080;
-const productsRouter = require("./routes/products-router.js");
-const cartsRouter = require("./routes/carts-router.js");
-const viewsRouter = require("./routes/views-router.js");
 
-// Socket.io
-const socket = require("socket.io");
-
-// Importo express-handlebars
-const exphbs = require("express-handlebars");
-
-// Configuramos Express-Handlebars 
-app.engine("handlebars", exphbs.engine());
+// Configuración de Handlebars
+app.engine("handlebars", engine());
 app.set("view engine", "handlebars");
 app.set("views", "./src/views");
 
-// Middleware: 
-app.use(express.json()); 
-app.use(express.static("./src/public"));  // Corrige la ruta aquí
-
-// Le decimos al servidor que vamos a trabajar con JSON. 
+// Middleware
+app.use(express.json());
+app.use(express.static("./src/public"));
+app.use(express.urlencoded({extended: true}));
+app.use(cookieParser());
+app.use(passport.initialize());
+initializePassport();
 
 // Rutas
 app.use("/api/products", productsRouter);
 app.use("/api/carts", cartsRouter);
 app.use("/", viewsRouter);
+app.use("/", viewsUserRouter);
+app.use("/api/sessions", userRouter);
 
-const httpServer = app.listen(PUERTO, () => {
-    console.log(`Conectado al puerto de Efrain: ${PUERTO}`);
+
+// Inicialización del servidor HTTP
+const httpServer = createServer(app);
+httpServer.listen(PUERTO, () => {
+    console.log(`Conectado al puerto de Efrain Vitalis: ${PUERTO}`);
 });
 
-// Traemos el productManager
-const ProductManager = require("./manager/product-manager.js");
-const manager = new ProductManager("./src/data/productos.json");
+// Inicialización de ProductManager
+const manager = new ProductManager();
 
 // Socket.io
-const io = socket(httpServer);
+const io = new Server(httpServer);
 
 io.on("connection", async (socket) => {
     console.log("Un cliente se conectó");
 
-    // Envio el array de productos al realtimeProducts
+    // Envío el array de productos al realtimeProducts
     socket.emit("productos", await manager.getProducts());
 
     // Recibo el evento eliminarProducto
     socket.on("eliminarProducto", async (id) => {
         await manager.deleteProduct(id);
-
         // Luego actualizamos los productos
         io.emit("productos", await manager.getProducts());
     });
 
-      // Manejar el evento para agregar un producto
-      socket.on("agregarProducto", async (newProduct) => {
+    // Manejar el evento para agregar un producto
+    socket.on("agregarProducto", async (newProduct) => {
         try {
             await manager.addProduct(newProduct);
             io.emit("productos", await manager.getProducts());
@@ -119,5 +73,4 @@ io.on("connection", async (socket) => {
             console.error('Error agregando producto:', error);
         }
     });
-
-    });
+});
